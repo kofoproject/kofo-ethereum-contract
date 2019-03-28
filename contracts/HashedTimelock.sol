@@ -40,14 +40,6 @@ contract HashedTimelock {
     // LockContract 容器
     mapping(bytes32 => Lock) locks;
 
-    constructor(address feeAccount_, uint feeRate_) public {
-        require(feeAccount_ != address(0), "feeAccount illegal");
-        require(feeRate_ <= 1e18, "feeRate illegal");
-        admin = msg.sender;
-        feeAccount = feeAccount_;
-        feeRate = feeRate_;
-    }
-
     // 事件定义
     event LogLock(
         bytes32 indexed lockId,
@@ -58,14 +50,21 @@ contract HashedTimelock {
     //超过此高度只能赎回，不能取现
         uint nLockNum
     );
-
     //preimage 不能使用index，过长会有问题
     event LogWithdraw(bytes32 indexed lockId, string preimage);
     event LogRefund(bytes32 indexed lockId);
 
+    constructor(address feeAccount_, uint feeRate_) public {
+        require(feeAccount_ != address(0), "feeAccount illegal");
+        require(feeRate_ <= 1e18, "feeRate illegal");
+        admin = msg.sender;
+        feeAccount = feeAccount_;
+        feeRate = feeRate_;
+    }
+
     /// Check whether the msg.sender is admin
     modifier isAdmin() {
-        require(msg.sender == admin);
+        require(msg.sender == admin, "sender should be the administrator");
         _;
     }
 
@@ -119,28 +118,47 @@ contract HashedTimelock {
     }
 
     /// Get the admin address
-    function getAdmin() external view returns (address) {
+    function getAdmin()
+    external
+    view
+    returns (address)
+    {
         return admin;
     }
 
     /// Get the feeAccount address
-    function getFeeAccount() external view returns (address) {
+    function getFeeAccount()
+    external
+    view
+    returns (address)
+    {
         return feeAccount;
     }
 
     /// Get the feeRate
-    function getFeeRate() external view returns (uint) {
+    function getFeeRate()
+    external
+    view
+    returns (uint)
+    {
         return feeRate;
     }
 
     /// Changes the official admin address.
-    function changeAdmin(address admin_) external isAdmin {
+    function changeAdmin(address admin_)
+    external
+    isAdmin
+    {
         require(admin_ != address(0));
         admin = admin_;
     }
 
     /// Check whether the address is special address
-    function isSpecialAddress(address address_) public view returns (bool){
+    function isSpecialAddress(address address_)
+    public
+    view
+    returns (bool)
+    {
         if (specialFeeRates[address_].isSpecial) {
             return true;
         }
@@ -148,13 +166,20 @@ contract HashedTimelock {
     }
 
     /// Get the specialFeeRate
-    function getSpecialFeeRate(address specialAddress_) public view returns (uint) {
+    function getSpecialFeeRate(address specialAddress_)
+    public
+    view
+    returns (uint)
+    {
         require(specialAddress_ != address(0));
         return (specialFeeRates[specialAddress_].specialFeeRate);
     }
 
     /// Update the special address
-    function specialFeeRateUpdate(address specialAddress_, uint feeRate_) external isAdmin {
+    function specialFeeRateUpdate(address specialAddress_, uint feeRate_)
+    external
+    isAdmin
+    {
         require(specialAddress_ != address(0));
         require(feeRate_ <= 1e18, "feeRate illegal");
         specialFeeRates[specialAddress_].isSpecial = true;
@@ -162,20 +187,29 @@ contract HashedTimelock {
     }
 
     /// Delete the special address
-    function specialAddressDelete(address specialAddress_) external isAdmin {
+    function specialAddressDelete(address specialAddress_)
+    external
+    isAdmin
+    {
         require(specialAddress_ != address(0));
         specialFeeRates[specialAddress_].isSpecial = false;
         specialFeeRates[specialAddress_].specialFeeRate = 0;
     }
 
     /// Changes the account address that receives fees
-    function changeFeeAccount(address feeAccount_) external isAdmin {
+    function changeFeeAccount(address feeAccount_)
+    external
+    isAdmin
+    {
         require(feeAccount_ != address(0));
         feeAccount = feeAccount_;
     }
 
     /// Changes the feeRate
-    function changeFeeRate(uint feeRate_) external isAdmin {
+    function changeFeeRate(uint feeRate_)
+    external
+    isAdmin
+    {
         require(feeRate_ <= 1e18, "feeRate illegal");
         feeRate = feeRate_;
     }
@@ -317,7 +351,10 @@ contract HashedTimelock {
     }
 
     /// Transfer fee from msg.sender to feeAccount
-    function feeTransfer(uint amount_) internal returns (uint){
+    function feeTransfer(uint amount_)
+    internal
+    returns (uint)
+    {
         uint finalRate;
         if (isSpecialAddress(msg.sender)) {
             finalRate = getSpecialFeeRate(msg.sender);
