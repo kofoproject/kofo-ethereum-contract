@@ -53,6 +53,7 @@ contract HashedTimelock {
     //preimage 不能使用index，过长会有问题
     event LogWithdraw(bytes32 indexed lockId, string preimage);
     event LogRefund(bytes32 indexed lockId);
+    event LogAdminChange(address admin);
 
     constructor(address feeAccount_, uint feeRate_) public {
         require(feeAccount_ != address(0), "feeAccount illegal");
@@ -94,7 +95,9 @@ contract HashedTimelock {
 
     // 校验逻辑：合约Id所对应的合同是可提现的
     modifier withdrawable(bytes32 _lockId) {
-
+        // 要求：发起者权限
+        require(locks[_lockId].receiver == msg.sender || isSpecialAddress(msg.sender), "msg.sender not allowed to withdraw");
+        
         // 要求：合约尚未提现
         require(locks[_lockId].withdrawn == false, "lock is already withdraw");
 
@@ -105,7 +108,9 @@ contract HashedTimelock {
 
     // 校验逻辑：合约Id所对应的合同是可退款的
     modifier refundable(bytes32 _lockId) {
-
+        // 要求：发起者权限
+        require(locks[_lockId].sender == msg.sender || isSpecialAddress(msg.sender), "msg.sender not allowed to refund");
+        
         // 要求：合约尚未退款
         require(locks[_lockId].refunded == false, "lock is already refund");
 
@@ -151,6 +156,7 @@ contract HashedTimelock {
     {
         require(admin_ != address(0));
         admin = admin_;
+        emit LogAdminChange(admin_);
     }
 
     /// Check whether the address is special address
@@ -230,6 +236,7 @@ contract HashedTimelock {
     validLockNum(_nLockNum)
     returns (bytes32 lockId)
     {
+        require(_receiver != address(0));
 
         // 根据 【发送者 + 接受者 + 金额 + hValue + 锁定时间】 作为合约的唯一键
         lockId = sha256(abi.encodePacked(msg.sender, _receiver, msg.value, _hValue, _nLockNum));
@@ -237,7 +244,6 @@ contract HashedTimelock {
         //  不接受同样参数的合约
         if (haveLock(lockId))
             revert("There is no this lockId!");
-
 
         // 将构锁定同放入到mapping
         locks[lockId] = Lock(
@@ -250,7 +256,6 @@ contract HashedTimelock {
             false,
             "0x0"
         );
-
 
         // 发送事件
         emit LogLock(
