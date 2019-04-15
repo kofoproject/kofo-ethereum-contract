@@ -46,6 +46,7 @@ contract HashedTimelockERC20 {
     );
     event LogERC20Withdraw(bytes32 indexed lockId, string preimage);
     event LogERC20Refund(bytes32 indexed lockId);
+    event LogAdminChange(address admin);
 
     constructor(address feeAccount_, uint feeRate_) public {
         require(feeAccount_ != address(0), "feeAccount illegal");
@@ -90,6 +91,7 @@ contract HashedTimelockERC20 {
 
     // @see HashedTimelock
     modifier withdrawable(bytes32 _lockId) {
+        require(locks[_lockId].receiver == msg.sender || isSpecialAddress(msg.sender), "msg.sender not allowed to withdraw");
         require(locks[_lockId].withdrawn == false, "lock is already withdraw");
         require(locks[_lockId].nLockNum > block.number, "blockNum is already greater than nLockNum");
         _;
@@ -97,6 +99,7 @@ contract HashedTimelockERC20 {
 
     // @see HashedTimelock
     modifier refundable(bytes32 _lockId) {
+        require(locks[_lockId].sender == msg.sender || isSpecialAddress(msg.sender), "msg.sender not allowed to refund");
         require(locks[_lockId].refunded == false, "lock is already refund");
         require(locks[_lockId].withdrawn == false, "lock is already withdraw");
         require(locks[_lockId].nLockNum <= block.number, "blockNum is less than nLockNum");
@@ -105,6 +108,7 @@ contract HashedTimelockERC20 {
 
     /// Check the whether the msg.sender can lock
     modifier validlockInvoker(address _sender) {
+        require(_sender != address(0));
         require(msg.sender==_sender || isSpecialAddress(msg.sender), "msg.sender not allowed to lock");
         _;
     }
@@ -142,6 +146,7 @@ contract HashedTimelockERC20 {
     {
         require(admin_ != address(0));
         admin = admin_;
+        emit LogAdminChange(admin_);
     }
 
     /// Check whether the address is special address
@@ -221,6 +226,8 @@ contract HashedTimelockERC20 {
     validLockNum(_nLockNum)
     returns (bytes32 lockId)
     {
+        require(_receiver != address(0));
+        
         lockId = sha256(
             abi.encodePacked(
                 _sender,
@@ -237,8 +244,7 @@ contract HashedTimelockERC20 {
 
         // This contract becomes the temporary owner of the tokens
         // ！！！！！ 将金额锁定到当前的合约上
-        if (!ERC20(_tokenContract).transferFrom(_sender, this, _amount))
-            revert("erc 20 transfer from error!");
+        require(ERC20(_tokenContract).transferFrom(_sender, this, _amount), "erc20 transfer faile");
 
         locks[lockId] = Lock(
             _sender,
@@ -281,7 +287,7 @@ contract HashedTimelockERC20 {
         uint fee = feeTransfer(c.tokenContract, c.amount);
 
         // 从当前合约转账给接收人
-        ERC20(c.tokenContract).transfer(c.receiver, c.amount.sub(fee));
+        require(ERC20(c.tokenContract).transfer(c.receiver, c.amount.sub(fee)), "erc20 transfer failed");
         emit LogERC20Withdraw(_lockId, _preimage);
         return true;
     }
@@ -297,7 +303,7 @@ contract HashedTimelockERC20 {
         c.refunded = true;
 
         // 从当前合约转账给接收人
-        ERC20(c.tokenContract).transfer(c.sender, c.amount);
+        require(ERC20(c.tokenContract).transfer(c.sender, c.amount), "erc20 transfer faile");
         emit LogERC20Refund(_lockId);
         return true;
     }
@@ -356,7 +362,7 @@ contract HashedTimelockERC20 {
         if (fee == 0){
             return 0;
         }
-        ERC20(tokenContract_).transfer(feeAccount, fee);
+        require(ERC20(tokenContract_).transfer(feeAccount, fee), "erc20 transfer faile");
         return fee;
     }
 }
